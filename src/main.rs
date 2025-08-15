@@ -28,14 +28,13 @@ use esp_idf_hal::{
 use embedded_graphics::Drawable;
 
 mod display_driver;
-mod swapchain;
 
 use display_interface_spi::SPIInterface;
 use embedded_gfx::mesh::Geometry;
 use load_stl::embed_stl;
 use nalgebra::{Point2, Point3};
 
-use crate::{display_driver::FramebufferTarget, swapchain::DoubleBuffer};
+use crate::display_driver::FramebufferTarget;
 
 #[allow(clippy::approx_constant)]
 fn main() {
