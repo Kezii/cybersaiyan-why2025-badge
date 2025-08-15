@@ -2,11 +2,14 @@ use embedded_gfx::{
     draw::draw,
     framebuffer::DmaReadyFramebuffer,
     mesh::{K3dMesh, RenderMode},
+    perfcounter::PerformanceCounter,
     K3dengine,
 };
 use embedded_graphics::{
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::Rgb565,
     prelude::{IntoStorage, Point, WebColors},
+    text::Text,
 };
 use esp_idf_svc::hal::peripheral::Peripheral;
 use log::info;
@@ -21,6 +24,8 @@ use esp_idf_hal::{
     prelude::*,
     spi::{Dma, SpiAnyPins, SpiDeviceDriver, SpiDriver, SpiDriverConfig},
 };
+
+use embedded_graphics::Drawable;
 
 mod display_driver;
 mod swapchain;
@@ -64,7 +69,7 @@ fn main() {
     display.hard_reset(&mut delay).unwrap();
     display.init(&mut delay).unwrap();
     display
-        .set_orientation(display_driver::Orientation::Landscape)
+        .set_orientation(display_driver::Orientation::LandscapeSwapped)
         .unwrap();
 
     display.set_address_window(0, 0, 319, 239).unwrap();
@@ -88,16 +93,32 @@ fn main() {
     let mut rot = 0.0;
     let mut pos = 0.0;
 
+    let mut perf = PerformanceCounter::new();
+    perf.only_fps(false);
+
+    let text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_WHITE);
+
     loop {
+        perf.start_of_frame();
         raw_framebuffer_0.fill(0);
+        perf.add_measurement("clear");
 
         engine.render([&teapot], |p| {
             //println!("draw {:?}", &p);
             draw(p, &mut dma_ready_framebuffer);
         });
+
+        perf.add_measurement("render");
+
+        Text::new(perf.get_text(), Point::new(20, 20), text_style)
+            .draw(&mut dma_ready_framebuffer)
+            .unwrap();
+
         display
             .eat_framebuffer(dma_ready_framebuffer.as_slice())
             .unwrap();
+
+        perf.add_measurement("draw");
 
         teapot.set_attitude(rot, rot * 2.0, 0.0);
         rot += 0.03;
@@ -113,6 +134,10 @@ fn main() {
         engine
             .camera
             .set_position(Point3::new(0.0, 0.0, -3.0 + pos));
+
+        perf.add_measurement("update");
+
+        perf.print();
     }
 }
 
@@ -137,7 +162,7 @@ pub fn prepare_display<SPI: SpiAnyPins>(
     esp_idf_hal::gpio::PinDriver<'static, impl OutputPin, esp_idf_hal::gpio::Output>,
 > {
     let config = esp_idf_hal::spi::config::Config::new()
-        .baudrate(20.MHz().into())
+        .baudrate(80.MHz().into())
         .data_mode(esp_idf_hal::spi::config::MODE_0)
         .queue_size(1);
     let device = SpiDeviceDriver::new_single(
