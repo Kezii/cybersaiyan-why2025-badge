@@ -8,17 +8,15 @@ use embedded_gfx::{
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::Rgb565,
-    prelude::{IntoStorage, Point, WebColors},
+    prelude::{Point, WebColors},
     text::Text,
 };
 use esp_idf_svc::hal::peripheral::Peripheral;
-use log::info;
 use std::{f32::consts::PI, ffi::c_void};
 
 use esp_idf_hal::{
     delay::Ets,
     gpio::{InputPin, Output, OutputPin, PinDriver},
-    io::Write,
     ledc::{LedcChannel, LedcTimer},
     peripherals,
     prelude::*,
@@ -32,7 +30,7 @@ mod display_driver;
 use display_interface_spi::SPIInterface;
 use embedded_gfx::mesh::Geometry;
 use load_stl::embed_stl;
-use nalgebra::{Point2, Point3};
+use nalgebra::Point3;
 
 use crate::display_driver::FramebufferTarget;
 
