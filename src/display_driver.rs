@@ -159,7 +159,7 @@ where
         self.write_data(&[0b0000_0000])?;
         self.write_command(Instruction::COLMOD)?; // 16bit 65k colors
         self.write_data(&[0b0101_0101])?;
-        self.write_command(Instruction::INVON)?; // hack?
+        //self.write_command(Instruction::INVON)?; // hack?
         delay_source.delay_us(10_000);
         self.write_command(Instruction::NORON)?; // turn on display
         delay_source.delay_us(10_000);

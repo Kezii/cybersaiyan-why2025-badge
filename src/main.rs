@@ -1,6 +1,15 @@
-use embedded_gfx::{draw::draw, framebuffer::DmaReadyFramebuffer, mesh::{K3dMesh, RenderMode}, K3dengine};
-use embedded_graphics::{pixelcolor::Rgb565, prelude::{IntoStorage, Point, WebColors}};
+use embedded_gfx::{
+    draw::draw,
+    framebuffer::DmaReadyFramebuffer,
+    mesh::{K3dMesh, RenderMode},
+    K3dengine,
+};
+use embedded_graphics::{
+    pixelcolor::Rgb565,
+    prelude::{IntoStorage, Point, WebColors},
+};
 use esp_idf_svc::hal::peripheral::Peripheral;
+use log::info;
 use std::{f32::consts::PI, ffi::c_void};
 
 use esp_idf_hal::{
@@ -27,7 +36,6 @@ use crate::{display_driver::FramebufferTarget, swapchain::DoubleBuffer};
 fn main() {
     esp_idf_svc::sys::link_patches();
 
-    // esp_idf_hal::i2s::I2sDriver::new_std_tx(i2s, config, bclk, dout, mclk, ws)
     let peripherals = peripherals::Peripherals::take().unwrap();
 
     let pins = peripherals.pins;
@@ -43,34 +51,28 @@ fn main() {
         Some(pins.gpio10),
         pins.gpio3,
         pins.gpio4,
-        pins.gpio9, // not true
+        pins.gpio11, // not true
         ledc.timer0,
         ledc.channel0,
     );
 
-    let mut delay = Ets;
+    let button_a = PinDriver::input(pins.gpio8).unwrap();
+    let button_b = PinDriver::input(pins.gpio9).unwrap();
 
-    let hor_res = 320;
-    let ver_res = 240;
-    let boh1 = 40;
-    let boh2 = 53;
+    let mut delay = Ets;
 
     display.hard_reset(&mut delay).unwrap();
     display.init(&mut delay).unwrap();
     display
         .set_orientation(display_driver::Orientation::Landscape)
         .unwrap();
-    //display
-    //    .set_address_window(0 + boh1, 0 + boh2, hor_res - 1 + boh1, ver_res + boh2)
-    //    .unwrap();
 
-         display
-       .set_address_window(0, 0, 319, 239)
-         .unwrap();
+    display.set_address_window(0, 0, 319, 239).unwrap();
 
     let mut raw_framebuffer_0 = Box::new([0u16; 240 * 320]);
 
-    let mut dma_ready_framebuffer = DmaReadyFramebuffer::<320, 240>::new(raw_framebuffer_0.as_mut_ptr() as *mut c_void, false);
+    let mut dma_ready_framebuffer =
+        DmaReadyFramebuffer::<320, 240>::new(raw_framebuffer_0.as_mut_ptr() as *mut c_void, true);
 
     let mut teapot = K3dMesh::new(embed_stl!("src/Teapot_low.stl"));
     teapot.set_position(0.0, 0.0, 0.0);
@@ -79,26 +81,38 @@ fn main() {
     teapot.set_color(Rgb565::CSS_BLUE);
 
     let mut engine = K3dengine::new(320, 240);
-    engine.camera.set_position(Point3::new(0.0, -0.0, -3.0));
+    engine.camera.set_position(Point3::new(0.0, 0.0, -3.0));
     engine.camera.set_target(Point3::new(0.0, 0.0, 0.0));
     engine.camera.set_fovy(PI / 5.0);
 
     let mut rot = 0.0;
+    let mut pos = 0.0;
 
     loop {
-        raw_framebuffer_0.fill(Rgb565::CSS_RED.into_storage());
-
+        raw_framebuffer_0.fill(0);
 
         engine.render([&teapot], |p| {
             //println!("draw {:?}", &p);
             draw(p, &mut dma_ready_framebuffer);
         });
-        display.eat_framebuffer(dma_ready_framebuffer.as_slice()).unwrap();
+        display
+            .eat_framebuffer(dma_ready_framebuffer.as_slice())
+            .unwrap();
 
-        teapot.set_attitude(rot, rot*2.0, 0.0);
+        teapot.set_attitude(rot, rot * 2.0, 0.0);
         rot += 0.03;
 
-                
+        if button_a.is_high() && button_b.is_low() {
+            pos += 0.05;
+        }
+
+        if button_a.is_low() && button_b.is_high() {
+            pos -= 0.05;
+        }
+
+        engine
+            .camera
+            .set_position(Point3::new(0.0, 0.0, -3.0 + pos));
     }
 }
 
